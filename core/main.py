@@ -17,33 +17,28 @@ class AIRequest(BaseModel):
 @app.post("/ask_ai")
 def ask_ai(request: AIRequest):
     try:
-        # 1. Debugging: Print what we received
-        print(f"📝 Query: {request.query}")
-        print(f"🎤 Audio Length: {len(request.audio_data) if request.audio_data else 'None'}")
-
-        # 2. Safety Check: If both are empty, stop immediately
-        if not request.query and not request.audio_data:
-            return {"answer": "Error: No audio or text received by the server."}
-
-        model = genai.GenerativeModel('gemini-1.5-flash-latest')
+        # Standardize on gemini-1.5-flash
+        model = genai.GenerativeModel('gemini-1.5-flash') 
 
         if request.audio_data:
-            # Voice Mode
+            # For voice messages
             response = model.generate_content([
-                "Listen to this request and answer it concisely.",
-                {
-                    "mime_type": "audio/mp4",
-                    "data": request.audio_data
-                }
+                "Please respond to this audio request concisely.",
+                {"mime_type": "audio/mp4", "data": request.audio_data}
             ])
         else:
-            # Text Mode
+            # For text messages
             response = model.generate_content(request.query)
 
-        return {"answer": response.text}
+        # CRITICAL: Always return a valid JSON object with the "answer" key
+        if response and response.text:
+            return {"answer": response.text}
+        else:
+            return {"answer": "AI processed the request but returned an empty response."}
 
     except Exception as e:
-        print(f"❌ ERROR: {e}")
+        print(f"❌ BACKEND ERROR: {e}")
+        # This will show the actual error on your mobile screen
         return {"answer": f"Backend Error: {str(e)}"}
 
 if __name__ == "__main__":
