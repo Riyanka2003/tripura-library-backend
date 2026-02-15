@@ -1,44 +1,45 @@
-import os
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import google.generativeai as genai
+import os
 import uvicorn
 
 app = FastAPI()
 
-# 1. NETWORK CONFIGURATION
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Configure Gemini
+genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
 
-# 2. AI CONFIGURATION
-# ✅ FIXED: Now matching your Render variable name "GEMINI_API_KEY"
-api_key = os.getenv("GEMINI_API_KEY")
-
-if not api_key:
-    print("❌ ERROR: API Key is missing! Check 'GEMINI_API_KEY' in Render environment.")
-else:
-    genai.configure(api_key=api_key)
-
-# 3. ENDPOINT
+# Update the Request Model to accept Audio
 class AIRequest(BaseModel):
-    query: str
+    query: str = ""
+    audio_data: str = None  # This will hold the voice recording (Base64)
 
 @app.post("/ask_ai")
 def ask_ai(request: AIRequest):
     try:
-        if not api_key:
-            return {"answer": "Backend Error: API Key not configured."}
+        # 1. Debugging: Print what we received
+        print(f"📝 Query: {request.query}")
+        print(f"🎤 Audio Length: {len(request.audio_data) if request.audio_data else 'None'}")
 
-        # Using 'gemini-1.5-flash' for better stability
-        model = genai.GenerativeModel('gemini-flash-latest') 
-        
-        response = model.generate_content(request.query)
+        # 2. Safety Check: If both are empty, stop immediately
+        if not request.query and not request.audio_data:
+            return {"answer": "Error: No audio or text received by the server."}
+
+        model = genai.GenerativeModel('gemini-1.5-flash')
+
+        if request.audio_data:
+            # Voice Mode
+            response = model.generate_content([
+                "Listen to this request and answer it concisely.",
+                {
+                    "mime_type": "audio/mp4",
+                    "data": request.audio_data
+                }
+            ])
+        else:
+            # Text Mode
+            response = model.generate_content(request.query)
+
         return {"answer": response.text}
 
     except Exception as e:
