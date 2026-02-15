@@ -25,7 +25,7 @@ def ask_ai(request: AIRequest):
         if not request.query and not request.audio_data:
             return {"answer": "Error: No audio or text received by the server."}
 
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-1.5-flash-latest')
 
         if request.audio_data:
             # Voice Mode
