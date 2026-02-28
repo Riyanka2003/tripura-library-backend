@@ -3,7 +3,7 @@ from pydantic import BaseModel
 import google.generativeai as genai
 import os
 import uvicorn
-
+from google.generativeai.types import RequestOptions
 app = FastAPI()
 
 # Configure Gemini
@@ -17,28 +17,26 @@ class AIRequest(BaseModel):
 @app.post("/ask_ai")
 def ask_ai(request: AIRequest):
     try:
-        # Standardize on gemini-1.5-flash
-        model = genai.GenerativeModel('gemini-1.5-flash') 
+        # Using a fixed version '001' is more stable than 'latest'
+        model = genai.GenerativeModel('gemini-1.5-flash-001') 
 
         if request.audio_data:
-            # For voice messages
+            # Voice Mode
             response = model.generate_content([
-                "Please respond to this audio request concisely.",
+                "Answer this voice request concisely.",
                 {"mime_type": "audio/mp4", "data": request.audio_data}
             ])
         else:
-            # For text messages
+            # Text Mode
             response = model.generate_content(request.query)
 
-        # CRITICAL: Always return a valid JSON object with the "answer" key
         if response and response.text:
             return {"answer": response.text}
         else:
-            return {"answer": "AI processed the request but returned an empty response."}
+            return {"answer": "AI processed the request but the response was empty."}
 
     except Exception as e:
-        print(f"❌ BACKEND ERROR: {e}")
-        # This will show the actual error on your mobile screen
+        # This sends the ACTUAL error message to your phone screen
         return {"answer": f"Backend Error: {str(e)}"}
 
 if __name__ == "__main__":
