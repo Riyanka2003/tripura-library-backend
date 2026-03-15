@@ -3,9 +3,22 @@ from pydantic import BaseModel
 import google.generativeai as genai
 import os
 import uvicorn
+from fastapi.middleware.cors import CORSMiddleware
 from google.generativeai.types import RequestOptions
 app = FastAPI()
+# --- PROFESSIONAL CORS CONFIGURATION ---
+origins = [
+    "http://localhost:3000",
+    "https://tripura-library-live.vercel.app", # Your live frontend
+]
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 # Configure Gemini
 genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
 
