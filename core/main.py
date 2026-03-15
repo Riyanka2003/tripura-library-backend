@@ -31,7 +31,7 @@ class AIRequest(BaseModel):
 def ask_ai(request: AIRequest):
     try:
         # Using a fixed version '001' is more stable than 'latest'
-        model = genai.GenerativeModel('gemini-1.5-flash-001') 
+        model = genai.GenerativeModel('gemini-2.5-flash') 
 
         if request.audio_data:
             # Voice Mode
