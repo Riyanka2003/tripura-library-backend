@@ -5,10 +5,10 @@ import os
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 from google.generativeai.types import RequestOptions
-import fitz  # PyMuPDF
+import fitz  # This is the correct import for PyMuPDF
 from PIL import Image
 import io
-from fastapi import UploadFile, File
+from fastapi import UploadFile, File, HTTPException
 
 app = FastAPI()
 
@@ -80,24 +80,27 @@ async def extract_metadata(file: UploadFile = File(...)):
     pix = page.get_pixmap()
     img_data = pix.tobytes("jpg")
     
-    # 4. Ask Gemini to analyze the text and extract info
+    # 4. Ask Gemini (Updated for cleaner JSON)
     prompt = f"""
     Extract the following details from this book text:
     - Title
     - Author
-    - ISBN (if available)
+    - ISBN
     - Edition
-    - Category (e.g., Textbook, Reference, Fiction)
+    - Category
     
     Text: {text_sample[:2000]}
-    Return as JSON only.
+    Return ONLY a raw JSON object. Do not include markdown formatting or backticks.
     """
     
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('gemini-2.5-flash')
     response = model.generate_content(prompt)
     
+    # Clean the response in case Gemini adds backticks anyway
+    clean_json = response.text.replace('```json', '').replace('```', '').strip()
+    
     return {
-        "metadata": response.text,
+        "metadata": clean_json,
         "has_cover": True
     }
 
