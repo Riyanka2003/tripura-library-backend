@@ -93,7 +93,7 @@ async def extract_metadata(file: UploadFile = File(...)):
 
         # 4. Ask Gemini 2.5 Flash to organize the data
         prompt = (
-            f"Extract the following book details from this text: Book Title, Author Name, ISBN, Edition, Category, Language, Standard/Class, Subjects/Tags, Description. "
+            f"Extract the following book details from this text: Book Title, Author Name, ISBN, Edition, Category, Language, Standard, Subjects, Description. "
             f"Text content: {text_sample[:2000]}. "
             f"Return ONLY a raw JSON object. Do not include markdown or backticks."
         )
@@ -101,8 +101,8 @@ async def extract_metadata(file: UploadFile = File(...)):
         model = genai.GenerativeModel('gemini-2.5-flash')
         response = model.generate_content(prompt)
         
-        # Clean response in case Gemini includes markdown
-        clean_json = response.text.replace('```json', '').replace('```', '').strip()
+        # More robust cleaning of Markdown/Backticks
+        clean_json = response.text.strip().removeprefix('```json').removesuffix('```').strip()
         
         # 5. Return everything to the Frontend
         return {
