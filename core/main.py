@@ -91,11 +91,20 @@ async def extract_metadata(file: UploadFile = File(...)):
         base64_cover = base64.b64encode(img_bytes).decode('utf-8')
         cover_url = f"data:image/jpeg;base64,{base64_cover}"
 
-        # 4. Ask Gemini 2.5 Flash to organize the data
+        # In your extract_metadata function in main.py
+
+        standards = "General, Class 1, Class 2, Class 3, Class 4, Class 5, Class 6, Class 7, Class 8, Class 9, Class 10, Class 11, Class 12"
+        categories = "Textbooks, History, Science, Physics, Chemistry, Biology, English literarture, English Grammer, Bengali, Bengali Grammer, Computer, EVS, Psychology, Sociology, Political Science, Education, Kokborok, Geography, Mathematics, Life Science, Physical Science, General Knowledge"
+
         prompt = (
-            f"Extract the following book details from this text: Book Title, Author Name, ISBN, Edition, Category, Language, Standard, Subjects, Description. "
-            f"Text content: {text_sample[:2000]}. "
-            f"Return ONLY a raw JSON object. Do not include markdown or backticks."
+            f"Extract book details from this text: {text_sample[:2000]}. "
+            f"Return ONLY a raw JSON object with these EXACT keys: "
+            f"'title', 'author', 'isbn', 'edition', 'category', 'language', 'standard', 'subjects', 'description'.\n\n"
+            f"CRITICAL RULES:\n"
+            f"1. 'standard' MUST be exactly one of these: [{standards}].\n"
+            f"2. 'category' MUST be exactly one of these: [{categories}].\n"
+            f"3. If ISBN is not found, use null.\n"
+            f"4. Do not use markdown backticks."
         )
         
         model = genai.GenerativeModel('gemini-2.5-flash')
