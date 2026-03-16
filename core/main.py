@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 import google.generativeai as genai
 import os
+import base64
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 from google.generativeai.types import RequestOptions
@@ -64,46 +65,54 @@ def ask_ai(request: AIRequest):
         # This sends the ACTUAL error message to your phone screen
         return {"answer": f"Backend Error: {str(e)}"}
 
+# ... (all your imports and middle code remain the same) ...
+
 @app.post("/api/extract-metadata")
 async def extract_metadata(file: UploadFile = File(...)):
-    # 1. Read the PDF content
-    pdf_content = await file.read()
-    doc = fitz.open(stream=pdf_content, filetype="pdf")
-    
-    # 2. Extract text from the first two pages for metadata
-    text_sample = ""
-    for i in range(min(2, len(doc))):
-        text_sample += doc[i].get_text()
+    try:
+        # 1. Read the PDF content from the upload
+        pdf_content = await file.read()
+        doc = fitz.open(stream=pdf_content, filetype="pdf")
+        
+        # 2. Extract text for Gemini (Metadata)
+        text_sample = ""
+        for i in range(min(2, len(doc))):
+            text_sample += doc[i].get_text()
 
-    # 3. Extract the first page as an image (Cover Page)
-    page = doc[0]
-    pix = page.get_pixmap()
-    img_data = pix.tobytes("jpg")
-    
-    # 4. Ask Gemini (Updated for cleaner JSON)
-    prompt = f"""
-    Extract the following details from this book text:
-    - Title
-    - Author
-    - ISBN
-    - Edition
-    - Category
-    
-    Text: {text_sample[:2000]}
-    Return ONLY a raw JSON object. Do not include markdown formatting or backticks.
-    """
-    
-    model = genai.GenerativeModel('gemini-2.5-flash')
-    response = model.generate_content(prompt)
-    
-    # Clean the response in case Gemini adds backticks anyway
-    clean_json = response.text.replace('```json', '').replace('```', '').strip()
-    
-    return {
-        "metadata": clean_json,
-        "has_cover": True
-    }
+        # 3. EXTRACTION OF COVER PAGE (The "JPG code")
+        # Grab the first page
+        page = doc[0]
+        # Render page to an image (pixmap)
+        pix = page.get_pixmap(matrix=fitz.Matrix(300/72, 300/72)) # Higher DPI for professional look
+        # Convert pixmap to JPEG bytes
+        img_bytes = pix.tobytes("jpg")
+        
+        # Encode bytes to Base64 string so it can travel in JSON
+        base64_cover = base64.b64encode(img_bytes).decode('utf-8')
+        cover_url = f"data:image/jpeg;base64,{base64_cover}"
 
+        # 4. Ask Gemini 2.5 Flash to organize the data
+        prompt = (
+            f"Extract the following book details from this text: Book Title, Author Name, ISBN, Edition, Category, Language, Standard/Class, Subjects/Tags, Description. "
+            f"Text content: {text_sample[:2000]}. "
+            f"Return ONLY a raw JSON object. Do not include markdown or backticks."
+        )
+        
+        model = genai.GenerativeModel('gemini-2.5-flash')
+        response = model.generate_content(prompt)
+        
+        # Clean response in case Gemini includes markdown
+        clean_json = response.text.replace('```json', '').replace('```', '').strip()
+        
+        # 5. Return everything to the Frontend
+        return {
+            "metadata": clean_json, 
+            "cover_preview": cover_url, # This will show the image in your dashboard
+            "success": True
+        }
 
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    except Exception as e:
+        print(f"Error during extraction: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Render handles this via the Start Command in Settings.
