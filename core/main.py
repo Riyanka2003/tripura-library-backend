@@ -9,7 +9,8 @@ app = FastAPI()
 # --- PROFESSIONAL CORS CONFIGURATION ---
 origins = [
     "http://localhost:3000",
-    "https://tripura-library-live.vercel.app", # Your live frontend
+    "https://tripura-library-live.vercel.app", # Primary Alias
+    "https://tripura-library-live-4r18s168e-riyanka-bhowmiks-projects.vercel.app" # Deployment URL
 ]
 
 app.add_middleware(
@@ -19,6 +20,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.get("/health")
+async def health_check():
+    return {"status": "online", "version": "1.0.1"}
+
 # Configure Gemini
 genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
 
@@ -52,9 +58,6 @@ def ask_ai(request: AIRequest):
         # This sends the ACTUAL error message to your phone screen
         return {"answer": f"Backend Error: {str(e)}"}
 
-@app.get("/health")
-async def health_check():
-    return {"status": "online", "version": "1.0.1"}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
