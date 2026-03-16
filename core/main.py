@@ -52,5 +52,9 @@ def ask_ai(request: AIRequest):
         # This sends the ACTUAL error message to your phone screen
         return {"answer": f"Backend Error: {str(e)}"}
 
+@app.get("/health")
+async def health_check():
+    return {"status": "online", "version": "1.0.1"}
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
