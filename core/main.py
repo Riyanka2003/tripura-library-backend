@@ -70,7 +70,7 @@ def ask_ai(request: AIRequest):
 @app.post("/api/extract-metadata")
 async def extract_metadata(file: UploadFile = File(...)):
     try:
-        # 1. Read the PDF content from the upload
+        # 1. Read the PDF content
         pdf_content = await file.read()
         doc = fitz.open(stream=pdf_content, filetype="pdf")
         
@@ -79,19 +79,24 @@ async def extract_metadata(file: UploadFile = File(...)):
         for i in range(min(2, len(doc))):
             text_sample += doc[i].get_text()
 
-        # 3. EXTRACTION OF COVER PAGE (The "JPG code")
-        # Grab the first page
+        # 3. Extract the Cover Page (JPG)
         page = doc[0]
-        # Render page to an image (pixmap)
-        pix = page.get_pixmap(matrix=fitz.Matrix(300/72, 300/72)) # Higher DPI for professional look
-        # Convert pixmap to JPEG bytes
+        pix = page.get_pixmap(matrix=fitz.Matrix(200/72, 200/72)) 
         img_bytes = pix.tobytes("jpg")
-        
-        # Encode bytes to Base64 string so it can travel in JSON
         base64_cover = base64.b64encode(img_bytes).decode('utf-8')
-        cover_url = f"data:image/jpeg;base64,{base64_cover}"
 
-        # In your extract_metadata function in main.py
+        # 4. --- NEW: PDF COMPRESSION LOGIC ---
+        # We save the PDF with 'garbage=4' to remove duplicate objects
+        # and 'deflate=True' to compress the streams.
+        compressed_stream = io.BytesIO()
+        doc.save(
+            compressed_stream, 
+            garbage=4, 
+            deflate=True, 
+            clean=True
+        )
+        compressed_bytes = compressed_stream.getvalue()
+        base64_pdf = base64.b64encode(compressed_bytes).decode('utf-8')
 
         standards = "General, Class 1, Class 2, Class 3, Class 4, Class 5, Class 6, Class 7, Class 8, Class 9, Class 10, Class 11, Class 12"
         categories = "Textbooks, History, Science, Physics, Chemistry, Biology, English literarture, English Grammer, Bengali, Bengali Grammer, Computer, EVS, Psychology, Sociology, Political Science, Education, Kokborok, Geography, Mathematics, Life Science, Physical Science, General Knowledge"
@@ -109,19 +114,21 @@ async def extract_metadata(file: UploadFile = File(...)):
         
         model = genai.GenerativeModel('gemini-2.5-flash')
         response = model.generate_content(prompt)
-        
-        # More robust cleaning of Markdown/Backticks
         clean_json = response.text.strip().removeprefix('```json').removesuffix('```').strip()
         
-        # 5. Return everything to the Frontend
         return {
             "metadata": clean_json, 
-            "cover_preview": cover_url, # This will show the image in your dashboard
+            "cover_preview": f"data:image/jpeg;base64,{base64_cover}",
+            "compressed_pdf": f"data:application/pdf;base64,{base64_pdf}", # Smaller version for Supabase
             "success": True
         }
 
     except Exception as e:
-        print(f"Error during extraction: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# Render handles this via the Start Command in Settings.
+@app.delete("/api/books/{book_id}")
+async def delete_book(book_id: int):
+    # This endpoint can be expanded if you want the backend to handle 
+    # complex cleanup, but we'll trigger the main delete from the frontend
+    # to keep your Supabase logic centralized.
+    return {"success": True, "message": "Deletion request received"}
